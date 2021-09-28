@@ -34,14 +34,14 @@ impl Displays {
     }
 
     pub fn display_board(&self, board_state: &BoardState) {
-        for Display in self.0.iter() {
-            Display.display_board(board_state);
+        for display in self.0.iter() {
+            display.display_board(board_state);
         }
     }
 
     pub fn display_checkmate(&self, winner: Colour) {
-        for Display in self.0.iter() {
-            Display.display_checkmate(winner);
+        for display in self.0.iter() {
+            display.display_checkmate(winner);
         }
     }
 }
