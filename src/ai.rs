@@ -1,16 +1,50 @@
-use chess::{
-    board_iterator,
-    BoardState,
-    Colour::*,
-    //ColumnIndex::{self, *},
-    Move,
-    PieceType::*,
-    //RowIndex::{self, *},
+use crate::{
+    board::{
+        coordinates::Move,
+        grid::board_iterator,
+        //ColumnIndex::{self, *},
+        //RowIndex::{self, *},
+        piece::{
+            Colour::{self, *},
+            PieceType::*,
+        },
+        BoardState,
+    },
+    display::Display,
+    Player,
 };
-use std::f64;
+
+struct NoDisplay {}
+
+impl Display for NoDisplay {
+    fn get_unique_id(&self) -> u32 {
+        0
+    }
+    fn display_board(&self, _: &BoardState) {}
+    fn display_checkmate(&self, _: Colour) {}
+}
+
+pub struct AiPlayer {
+    depth: u8,
+}
+
+impl AiPlayer {
+    pub fn new(depth: u8) -> Self {
+        AiPlayer { depth }
+    }
+}
+
+impl Player for AiPlayer {
+    fn get_move(&self, board_state: &mut BoardState) -> std::io::Result<Move> {
+        Ok(get_best_move(board_state, self.depth))
+    }
+    fn get_display(&self) -> Box<dyn Display> {
+        Box::new(NoDisplay {})
+    }
+}
 
 /// Note: panics if already in checkmate
-pub fn get_best_move(board_state: &mut BoardState, depth: u8) -> Move {
+fn get_best_move(board_state: &mut BoardState, depth: u8) -> Move {
     fn rec_helper(
         state: &mut BoardState,
         depth: u8,
