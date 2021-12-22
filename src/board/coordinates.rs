@@ -60,7 +60,7 @@ pub struct Coordinate {
     pub column: ColumnIndex,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Move {
     pub from: Coordinate,
     pub to: Coordinate,

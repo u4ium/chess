@@ -1,4 +1,6 @@
-use enum_map::enum_map;
+use std::convert::TryInto;
+
+use enum_map::{enum_map, EnumMap};
 
 pub mod piece;
 use piece::*;
@@ -9,7 +11,9 @@ use coordinates::*;
 pub mod grid;
 use grid::*;
 
-#[derive(Debug)]
+mod fen;
+
+#[derive(Debug, PartialEq)]
 pub struct BoardState {
     pub board: Board,
     pub moves: Vec<Move>,
@@ -23,88 +27,22 @@ use RowIndex::*;
 impl BoardState {
     pub fn from_array(array: [[char; 8]; 8], player: Colour) -> Result<BoardState, String> {
         Ok(BoardState {
-            board: enum_map! {
-                _8 => enum_map!{
-                    A => Piece::from_char(array[_8 as usize][A as usize])?,
-                    B => Piece::from_char(array[_8 as usize][B as usize])?,
-                    C => Piece::from_char(array[_8 as usize][C as usize])?,
-                    D => Piece::from_char(array[_8 as usize][D as usize])?,
-                    E => Piece::from_char(array[_8 as usize][E as usize])?,
-                    F => Piece::from_char(array[_8 as usize][F as usize])?,
-                    G => Piece::from_char(array[_8 as usize][G as usize])?,
-                    H => Piece::from_char(array[_8 as usize][H as usize])?,
-                },
-                _7 => enum_map!{
-                    A => Piece::from_char(array[_7 as usize][A as usize])?,
-                    B => Piece::from_char(array[_7 as usize][B as usize])?,
-                    C => Piece::from_char(array[_7 as usize][C as usize])?,
-                    D => Piece::from_char(array[_7 as usize][D as usize])?,
-                    E => Piece::from_char(array[_7 as usize][E as usize])?,
-                    F => Piece::from_char(array[_7 as usize][F as usize])?,
-                    G => Piece::from_char(array[_7 as usize][G as usize])?,
-                    H => Piece::from_char(array[_7 as usize][H as usize])?,
-                },
-                _6 => enum_map!{
-                    A => Piece::from_char(array[_6 as usize][A as usize])?,
-                    B => Piece::from_char(array[_6 as usize][B as usize])?,
-                    C => Piece::from_char(array[_6 as usize][C as usize])?,
-                    D => Piece::from_char(array[_6 as usize][D as usize])?,
-                    E => Piece::from_char(array[_6 as usize][E as usize])?,
-                    F => Piece::from_char(array[_6 as usize][F as usize])?,
-                    G => Piece::from_char(array[_6 as usize][G as usize])?,
-                    H => Piece::from_char(array[_6 as usize][H as usize])?,
-                },
-                _5 => enum_map!{
-                    A => Piece::from_char(array[_5 as usize][A as usize])?,
-                    B => Piece::from_char(array[_5 as usize][B as usize])?,
-                    C => Piece::from_char(array[_5 as usize][C as usize])?,
-                    D => Piece::from_char(array[_5 as usize][D as usize])?,
-                    E => Piece::from_char(array[_5 as usize][E as usize])?,
-                    F => Piece::from_char(array[_5 as usize][F as usize])?,
-                    G => Piece::from_char(array[_5 as usize][G as usize])?,
-                    H => Piece::from_char(array[_5 as usize][H as usize])?,
-                },
-                _4 => enum_map!{
-                    A => Piece::from_char(array[_4 as usize][A as usize])?,
-                    B => Piece::from_char(array[_4 as usize][B as usize])?,
-                    C => Piece::from_char(array[_4 as usize][C as usize])?,
-                    D => Piece::from_char(array[_4 as usize][D as usize])?,
-                    E => Piece::from_char(array[_4 as usize][E as usize])?,
-                    F => Piece::from_char(array[_4 as usize][F as usize])?,
-                    G => Piece::from_char(array[_4 as usize][G as usize])?,
-                    H => Piece::from_char(array[_4 as usize][H as usize])?,
-                },
-                _3 => enum_map!{
-                    A => Piece::from_char(array[_3 as usize][A as usize])?,
-                    B => Piece::from_char(array[_3 as usize][B as usize])?,
-                    C => Piece::from_char(array[_3 as usize][C as usize])?,
-                    D => Piece::from_char(array[_3 as usize][D as usize])?,
-                    E => Piece::from_char(array[_3 as usize][E as usize])?,
-                    F => Piece::from_char(array[_3 as usize][F as usize])?,
-                    G => Piece::from_char(array[_3 as usize][G as usize])?,
-                    H => Piece::from_char(array[_3 as usize][H as usize])?,
-                },
-                _2 => enum_map!{
-                    A => Piece::from_char(array[_2 as usize][A as usize])?,
-                    B => Piece::from_char(array[_2 as usize][B as usize])?,
-                    C => Piece::from_char(array[_2 as usize][C as usize])?,
-                    D => Piece::from_char(array[_2 as usize][D as usize])?,
-                    E => Piece::from_char(array[_2 as usize][E as usize])?,
-                    F => Piece::from_char(array[_2 as usize][F as usize])?,
-                    G => Piece::from_char(array[_2 as usize][G as usize])?,
-                    H => Piece::from_char(array[_2 as usize][H as usize])?,
-                },
-                _1 => enum_map!{
-                    A => Piece::from_char(array[_1 as usize][A as usize])?,
-                    B => Piece::from_char(array[_1 as usize][B as usize])?,
-                    C => Piece::from_char(array[_1 as usize][C as usize])?,
-                    D => Piece::from_char(array[_1 as usize][D as usize])?,
-                    E => Piece::from_char(array[_1 as usize][E as usize])?,
-                    F => Piece::from_char(array[_1 as usize][F as usize])?,
-                    G => Piece::from_char(array[_1 as usize][G as usize])?,
-                    H => Piece::from_char(array[_1 as usize][H as usize])?,
-                },
-            },
+            board: EnumMap::from_array(
+                array
+                    .iter()
+                    .map(|row| {
+                        Ok(EnumMap::from_array(
+                            row.iter()
+                                .map(|&c| Piece::from_char(c))
+                                .collect::<Result<Vec<_>, String>>()?
+                                .try_into()
+                                .unwrap(),
+                        ))
+                    })
+                    .collect::<Result<Vec<_>, String>>()?
+                    .try_into()
+                    .unwrap(),
+            ),
             moves: if player == White {
                 vec![]
             } else {

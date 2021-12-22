@@ -1,4 +1,4 @@
-use std::fmt::{Display, Formatter};
+use std::fmt::{self, Display, Formatter};
 
 use crate::board::{coordinates::*, grid::*};
 use RowIndex::*;
@@ -28,7 +28,7 @@ pub fn other_player(player: Colour) -> Colour {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Piece {
     pub piece_type: PieceType,
     pub colour: Colour,
@@ -48,7 +48,7 @@ impl Piece {
             }
             _ => return Err(format!("Invalid character for square {}", c)),
         };
-        let colour = if c.is_uppercase() { Black } else { White };
+        let colour = if c.is_uppercase() { White } else { Black };
         Ok(Some(Piece { piece_type, colour }))
     }
 

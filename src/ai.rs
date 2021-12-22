@@ -1,9 +1,7 @@
 use crate::{
     board::{
-        coordinates::Move,
+        coordinates::{ColumnIndex::*, Move, RowIndex::*},
         grid::board_iterator,
-        //ColumnIndex::{self, *},
-        //RowIndex::{self, *},
         piece::{
             Colour::{self, *},
             PieceType::*,
@@ -72,7 +70,7 @@ fn get_best_move(board_state: &mut BoardState, depth: u8) -> Move {
             let taken = state.do_move(&m, taken_from);
             match current_player {
                 White => {
-                    let (_, value) = rec_helper(state, depth, current_best, other_best);
+                    let (_, value) = rec_helper(state, depth - 1, current_best, other_best);
                     if value >= result.1 {
                         result.0 = Some(m);
                         result.1 = value;
@@ -107,39 +105,27 @@ fn get_best_move(board_state: &mut BoardState, depth: u8) -> Move {
     /// Return 1 for White Win, -1 for Black Win
     /// Otherwise, Return a number in range (-1, 1) estimating who is closer to winning
     fn heuristic(board_state: &BoardState) -> f64 {
-        //fn row_factor(row: RowIndex) -> f64 {
-        //    match row {
-        //        _1 => 0.0,
-        //        _2 => 0.1,
-        //        _3 => 0.2,
-        //        _4 => 0.4,
-        //        _5 => 0.6,
-        //        _6 => 0.8,
-        //        _7 => 0.9,
-        //        _8 => 1.0,
-        //    }
-        //}
-        //fn column_factor_helper(column: ColumnIndex) -> f64 {
-        //    match column {
-        //        A | H => 0.4,
-        //        B | G => 0.45,
-        //        C | F => 0.48,
-        //        D | E => 0.5,
-        //    }
-        //}
         board_iterator().fold(0.0, |result, (&row, &column)| {
-            //let column_factor = column_factor_helper(column);
+            let row_factor = match row {
+                _1 | _8 => 0.85,
+                _2 | _7 => 0.9,
+                _3 | _6 => 0.95,
+                _4 | _5 => 1.0,
+            };
+            let column_factor = match column {
+                A | H => 0.85,
+                B | G => 0.9,
+                C | F => 0.95,
+                D | E => 1.0,
+            };
             match board_state.board[row][column] {
-                Some(piece) => result + piece.get_value(),
-                //match piece.colour {
-                //    White => 0.75 * piece.get_value() + 0.25 * row_factor(row),
-                //    Black => -(0.75 * piece.get_value() + 0.25 * (1.0 - row_factor(row))),
-                //},
+                //Some(piece) => result + piece.get_value(),
+                Some(piece) => result + piece.get_value() * row_factor * column_factor,
                 None => result,
             }
         })
     }
-    let (m, _) = rec_helper(board_state, if depth == 0 { 1 } else { depth }, -1.0, 1.0);
+    let (m, _) = rec_helper(board_state, (depth | 1) * 2 - 1, -1.0, 1.0);
     m.unwrap_or_else(|| {
         panic!(
             "Cannot use AI to determine next move after Checkmate {:#?}",
