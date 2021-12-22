@@ -119,13 +119,14 @@ fn get_best_move(board_state: &mut BoardState, depth: u8) -> Move {
                 D | E => 1.0,
             };
             match board_state.board[row][column] {
-                //Some(piece) => result + piece.get_value(),
+                // Some(piece) => result + piece.get_value(),
                 Some(piece) => result + piece.get_value() * row_factor * column_factor,
                 None => result,
             }
         })
     }
-    let (m, _) = rec_helper(board_state, (depth | 1) * 2 - 1, -1.0, 1.0);
+    let depth = if depth == 0 { 1 } else { depth };
+    let (m, _) = rec_helper(board_state, depth * 2 - 1, -1.0, 1.0);
     m.unwrap_or_else(|| {
         panic!(
             "Cannot use AI to determine next move after Checkmate {:#?}",
