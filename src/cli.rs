@@ -8,6 +8,7 @@ use crate::{
         grid::Square,
         piece::{
             Colour::{self, *},
+            Piece,
             PieceType::*,
         },
         BoardState,
@@ -125,38 +126,37 @@ impl Player for InteractiveCliPlayer {
     }
 }
 
-fn pretty_print(board_state: &BoardState) -> String {
-    let print_square = |square: Square| -> String {
-        let print_piece = |p: String, colour: Colour| -> String {
-            match colour {
-                White => p,
-                Black => p.to_uppercase(),
-            }
-        };
-        match square {
-            Some(p) => print_piece(
-                match p.piece_type {
-                    Pawn => String::from("p"),
-                    Rook => String::from("r"),
-                    Knight => String::from("n"),
-                    Bishop => String::from("b"),
-                    King => String::from("k"),
-                    Queen => String::from("q"),
-                },
-                p.colour,
-            ),
-            None => String::from("_"),
+fn square_colour(rank: RowIndex, file: ColumnIndex) -> Colour {
+    let r = rank as u8;
+    let f = file as u8;
+    if f % 2 ^ r % 2 == 0 {
+        White
+    } else {
+        Black
+    }
+}
+
+fn print_square(square: Option<Piece>, rank: RowIndex, file: ColumnIndex) -> String {
+    match square {
+        Some(piece) => piece.to_string(),
+        None => match square_colour(rank, file) {
+            White => '◻',
+            Black => '◼',
         }
-    };
+        .to_string(),
+    }
+}
+
+fn pretty_print(board_state: &BoardState) -> String {
     print!("  ");
     for &column in ColumnIndex::get_columns() {
         print!(" {:?}", column);
     }
     println!("");
-    for &row in RowIndex::get_rows() {
-        print!("{:?}", row);
-        for (_, square) in board_state.board[row] {
-            print!(" {}", print_square(square));
+    for &rank in RowIndex::get_rows() {
+        print!("{:?}", rank);
+        for (file, square) in board_state.board[rank] {
+            print!(" {}", print_square(square, rank, file));
         }
         println!("");
     }

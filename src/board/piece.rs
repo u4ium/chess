@@ -1,3 +1,5 @@
+use std::fmt::{self, Display, Formatter};
+
 use crate::board::{coordinates::*, grid::*};
 use RowIndex::*;
 
@@ -26,7 +28,7 @@ pub fn other_player(player: Colour) -> Colour {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Piece {
     pub piece_type: PieceType,
     pub colour: Colour,
@@ -46,7 +48,7 @@ impl Piece {
             }
             _ => return Err(format!("Invalid character for square {}", c)),
         };
-        let colour = if c.is_uppercase() { Black } else { White };
+        let colour = if c.is_uppercase() { White } else { Black };
         Ok(Some(Piece { piece_type, colour }))
     }
 
@@ -155,5 +157,29 @@ impl Piece {
             White => value,
             Black => -value,
         }
+    }
+}
+
+impl Display for Piece {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match (self.colour, self.piece_type) {
+                (White, Pawn) => '♙',
+                (White, Rook) => '♖',
+                (White, Knight) => '♘',
+                (White, Bishop) => '♗',
+                (White, Queen) => '♕',
+                (White, King) => '♔',
+
+                (Black, Pawn) => '♟',
+                (Black, Rook) => '♜',
+                (Black, Knight) => '♞',
+                (Black, Bishop) => '♝',
+                (Black, Queen) => '♛',
+                (Black, King) => '♚',
+            }
+        )
     }
 }

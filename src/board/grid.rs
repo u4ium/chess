@@ -7,7 +7,8 @@ use crate::board::coordinates::*;
 use crate::board::piece::*;
 
 pub type Square = Option<Piece>;
-pub type Board = EnumMap<RowIndex, EnumMap<ColumnIndex, Square>>;
+pub type Row = EnumMap<ColumnIndex, Square>;
+pub type Board = EnumMap<RowIndex, Row>;
 
 type BoardIterator = Product<slice::Iter<'static, RowIndex>, slice::Iter<'static, ColumnIndex>>;
 pub fn board_iterator() -> BoardIterator {
