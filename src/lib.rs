@@ -4,6 +4,7 @@ pub mod ai;
 pub mod board;
 pub mod cli;
 pub mod display;
+pub mod parsing;
 
 use board::{coordinates::Move, piece::Colour::*, BoardState};
 use display::{Display, Displays};

@@ -14,9 +14,14 @@ use grid::*;
 mod fen;
 
 #[derive(Debug, PartialEq)]
+pub struct CastlingAvailability(EnumMap<Colour, EnumMap<ColumnIndex, bool>>);
+
+#[derive(Debug, PartialEq)]
 pub struct BoardState {
     pub board: Board,
     pub moves: Vec<Move>,
+    pub castling_availability: CastlingAvailability,
+    pub en_passant_availability: Option<Coordinate>,
 }
 
 use Colour::*;
@@ -25,35 +30,35 @@ use PieceType::*;
 use RowIndex::*;
 
 impl BoardState {
-    pub fn from_array(array: [[char; 8]; 8], player: Colour) -> Result<BoardState, String> {
-        Ok(BoardState {
-            board: EnumMap::from_array(
-                array
-                    .iter()
-                    .map(|row| {
-                        Ok(EnumMap::from_array(
-                            row.iter()
-                                .map(|&c| Piece::from_char(c))
-                                .collect::<Result<Vec<_>, String>>()?
-                                .try_into()
-                                .unwrap(),
-                        ))
-                    })
-                    .collect::<Result<Vec<_>, String>>()?
-                    .try_into()
-                    .unwrap(),
-            ),
-            moves: if player == White {
-                vec![]
-            } else {
-                vec![Move {
-                    // Bogus last move to set correct next_player
-                    from: Coordinate { row: _1, column: A },
-                    to: Coordinate { row: _1, column: A },
-                }]
-            },
-        })
-    }
+    // pub fn from_array(array: [[char; 8]; 8], player: Colour) -> Result<BoardState, String> {
+    //     Ok(BoardState {
+    //         board: EnumMap::from_array(
+    //             array
+    //                 .iter()
+    //                 .map(|row| {
+    //                     Ok(EnumMap::from_array(
+    //                         row.iter()
+    //                             .map(|&c| Piece::from_char(c))
+    //                             .collect::<Result<Vec<_>, String>>()?
+    //                             .try_into()
+    //                             .unwrap(),
+    //                     ))
+    //                 })
+    //                 .collect::<Result<Vec<_>, String>>()?
+    //                 .try_into()
+    //                 .unwrap(),
+    //         ),
+    //         moves: if player == White {
+    //             vec![]
+    //         } else {
+    //             vec![Move {
+    //                 // Bogus last move to set correct next_player
+    //                 from: Coordinate { row: _1, column: A },
+    //                 to: Coordinate { row: _1, column: A },
+    //             }]
+    //         },
+    //     })
+    // }
 
     pub fn new() -> BoardState {
         BoardState {
@@ -140,6 +145,29 @@ impl BoardState {
                 },
             },
             moves: vec![],
+            castling_availability: CastlingAvailability(enum_map! {
+                White => enum_map!{
+                    A => true,
+                    B => false,
+                    C => false,
+                    D => false,
+                    E => false,
+                    F => false,
+                    G => false,
+                    H => true,
+                },
+                Black => enum_map!{
+                    A => true,
+                    B => false,
+                    C => false,
+                    D => false,
+                    E => false,
+                    F => false,
+                    G => false,
+                    H => true,
+                },
+            }),
+            en_passant_availability: None,
         }
     }
 

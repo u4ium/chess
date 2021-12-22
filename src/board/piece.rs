@@ -1,3 +1,5 @@
+use enum_map::Enum;
+
 use std::fmt::{self, Display, Formatter};
 
 use crate::board::{coordinates::*, grid::*};
@@ -14,7 +16,7 @@ pub enum PieceType {
 }
 use PieceType::*;
 
-#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+#[derive(Copy, Clone, Enum, Eq, PartialEq, Debug)]
 pub enum Colour {
     Black,
     White,
@@ -35,25 +37,30 @@ pub struct Piece {
 }
 
 impl Piece {
-    pub fn from_char(c: char) -> Result<Option<Piece>, String> {
-        let piece_type = match c.to_ascii_lowercase() {
-            'p' => Pawn,
-            'r' => Rook,
-            'n' => Knight,
-            'b' => Bishop,
-            'q' => Queen,
-            'k' => King,
-            '_' => {
-                return Ok(None);
-            }
+    pub fn from_char(c: char) -> Result<Option<Self>, String> {
+        let square = match c {
+            'P' | '♙' => Piece::new(Pawn, White),
+            'R' | '♖' => Piece::new(Rook, White),
+            'N' | '♘' => Piece::new(Knight, White),
+            'B' | '♗' => Piece::new(Bishop, White),
+            'Q' | '♕' => Piece::new(Queen, White),
+            'K' | '♔' => Piece::new(King, White),
+
+            'p' | '♟' => Piece::new(Pawn, Black),
+            'r' | '♜' => Piece::new(Rook, Black),
+            'n' | '♞' => Piece::new(Knight, Black),
+            'b' | '♝' => Piece::new(Bishop, Black),
+            'q' | '♛' => Piece::new(Queen, Black),
+            'k' | '♚' => Piece::new(King, Black),
+
+            '_' | ' ' => return Ok(None),
             _ => return Err(format!("Invalid character for square {}", c)),
         };
-        let colour = if c.is_uppercase() { White } else { Black };
-        Ok(Some(Piece { piece_type, colour }))
+        Ok(Some(square))
     }
 
-    pub fn new(piece_type: PieceType, colour: Colour) -> Piece {
-        Piece { piece_type, colour }
+    pub fn new(piece_type: PieceType, colour: Colour) -> Self {
+        Self { piece_type, colour }
     }
 
     pub fn check_move(&self, board: &Board, m: &Move, by: Colour) -> Result<Coordinate, String> {
@@ -161,7 +168,7 @@ impl Piece {
 }
 
 impl Display for Piece {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "{}",
