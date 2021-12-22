@@ -16,6 +16,7 @@ use super::{
 };
 
 fn parse_castling_availability(fen_castling_field: &str) -> Result<CastlingAvailability, String> {
+    // TODO: prevent "buffer overflow"
     let fen_castling_field_chars: Vec<char> = fen_castling_field.chars().collect();
     let is_shredder = match fen_castling_field_chars[..] {
         [] => {
@@ -57,6 +58,7 @@ fn parse_castling_availability(fen_castling_field: &str) -> Result<CastlingAvail
 }
 
 fn parse_board(fen_pieces_field: &str) -> Result<Board, String> {
+    // TODO: prevent "buffer overflow"
     let rows: Vec<_> = fen_pieces_field.split('/').collect();
     let num_rows = rows.len();
     let rows: [&str; 8] = rows
@@ -64,7 +66,7 @@ fn parse_board(fen_pieces_field: &str) -> Result<Board, String> {
         .map_err(|_| format!("FEN PARSE ERROR: wrong number of rows ({}/8)", num_rows))?;
 
     let row_maps = rows
-        .into_iter()
+        .iter() // TODO: use into_iter
         .enumerate()
         .map(|(row_index, row)| {
             let mut pieces: [Option<Piece>; 8] = Default::default();
@@ -126,44 +128,44 @@ impl FromStr for BoardState {
                     // Empty squares are noted using digits 1 through 8 (the number of empty squares), 
                     // and "/" separates ranks.
 
-            next_player, // Active color:
-                         //  - "w" means White moves next
-                         //  - "b" means Black moves next.
+            active_player,  // Active player's colour:
+                            //  - "w" means White moves next
+                            //  - "b" means Black moves next.
 
-            castling_availability, // Castling availability: 
-                                 // If neither side can castle, this is "-". 
-                                 // Otherwise, this has one or more letters: 
-                                 //  - In Standard FEN:
-                                 //    - "K" (White can castle kingside)
-                                 //    - "Q" (White can castle queenside)
-                                 //    - "k" (Black can castle kingside)
-                                 //    - "q" (Black can castle queenside)
-                                 //  - OR in Shredder-FEN:
-                                 //    - "A"-"H" (White rook that started and remains in file X can be castled with)
-                                 //    - "a"-"h" (Black rook that started and remains in file X can be castled with)
-                                 //    - As many letters as there are rooks that can still be castled with
-                                 // A move that temporarily prevents castling does not negate this notation.
+            castling_availability,  // Castling availability: 
+                                    // If neither side can castle, this is "-". 
+                                    // Otherwise, this has one or more letters: 
+                                    //  - In Standard FEN:
+                                    //    - "K" (White can castle kingside)
+                                    //    - "Q" (White can castle queenside)
+                                    //    - "k" (Black can castle kingside)
+                                    //    - "q" (Black can castle queenside)
+                                    //  - OR in Shredder-FEN:
+                                    //    - "A"-"H" (White rook that started and remains in file X can be castled with)
+                                    //    - "a"-"h" (Black rook that started and remains in file X can be castled with)
+                                    //    - As many letters as there are rooks that can still be castled with
+                                    // A move that temporarily prevents castling does not negate this notation.
 
             en_passant, // En passant target square in algebraic notation. 
-                         //  - If there's no en passant target square, this is "-". 
-                         //  - If a pawn has just made a two-square move, this is the position "behind" the pawn. 
-                         //  - This is recorded regardless of whether there is a pawn in position to make an en passant capture.
+                        //  - If there's no en passant target square, this is "-". 
+                        //  - If a pawn has just made a two-square move, this is the position "behind" the pawn. 
+                        //  - This is recorded regardless of whether there is a pawn in position to make an en passant capture.
 
             _halfmove_clock, // Halfmove clock: The number of halfmoves since the last capture or pawn advance, used for the fifty-move rule.
 
-            _number_of_full_moves, // Fullmove number: The number of the full move. It starts at 1, and is incremented after Black's move.
+            _full_moves_number, // Fullmove number: The number of the full move. It starts at 1, and is incremented after Black's move.
 
         ]: [&str; 6] = fields.try_into().map_err(|_| format!("FEN PARSE ERROR: wrong number of fields in record ({}/6)", num_fields))?;
 
         let board = parse_board(pieces)?;
 
-        let moves = match next_player {
+        let moves = match active_player {
             "B" | "b" => Vec::new(), // TODO: remove this field and replace with next player / number_of full_moves
             "W" | "w" => Vec::new(), // TODO: remove this field and replace with next player / number_of full_moves
             _ => {
                 return Err(format!(
                     "FEN PARSE ERROR: next player must be 'b' or 'w' (not {})",
-                    next_player
+                    active_player
                 ))
             }
         };
