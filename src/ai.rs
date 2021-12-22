@@ -24,6 +24,7 @@ impl Display for NoDisplay {
     fn display_checkmate(&self, _: Colour) {}
 }
 
+#[derive(Debug)]
 pub struct AiPlayer {
     depth: u8,
 }

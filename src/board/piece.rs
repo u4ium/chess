@@ -1,3 +1,5 @@
+use std::fmt::{Display, Formatter};
+
 use crate::board::{coordinates::*, grid::*};
 use RowIndex::*;
 
@@ -155,5 +157,29 @@ impl Piece {
             White => value,
             Black => -value,
         }
+    }
+}
+
+impl Display for Piece {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match (self.colour, self.piece_type) {
+                (White, Pawn) => '♙',
+                (White, Rook) => '♖',
+                (White, Knight) => '♘',
+                (White, Bishop) => '♗',
+                (White, Queen) => '♕',
+                (White, King) => '♔',
+
+                (Black, Pawn) => '♟',
+                (Black, Rook) => '♜',
+                (Black, Knight) => '♞',
+                (Black, Bishop) => '♝',
+                (Black, Queen) => '♛',
+                (Black, King) => '♚',
+            }
+        )
     }
 }

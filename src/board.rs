@@ -9,6 +9,7 @@ use coordinates::*;
 pub mod grid;
 use grid::*;
 
+#[derive(Debug)]
 pub struct BoardState {
     pub board: Board,
     pub moves: Vec<Move>,
@@ -357,5 +358,11 @@ impl BoardState {
                 }
             }
         }
+    }
+}
+
+impl Default for BoardState {
+    fn default() -> Self {
+        Self::new()
     }
 }
