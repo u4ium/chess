@@ -2,7 +2,8 @@ use enum_map::Enum;
 
 use std::fmt::{self, Display, Formatter};
 
-use crate::board::{coordinates::*, grid::*};
+use crate::board::{coordinates::*, grid::*, MoveRecord};
+use ColumnIndex::*;
 use RowIndex::*;
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
@@ -34,6 +35,20 @@ pub fn other_player(player: Colour) -> Colour {
 pub struct Piece {
     pub piece_type: PieceType,
     pub colour: Colour,
+    has_moved: bool,
+}
+
+pub trait Movable {
+    fn moved(self, moved: bool) -> Self;
+}
+
+impl Movable for Option<Piece> {
+    fn moved(self, moved: bool) -> Self {
+        self.and_then(|mut piece| {
+            piece.has_moved = moved;
+            Some(piece)
+        })
+    }
 }
 
 impl Piece {
@@ -60,46 +75,68 @@ impl Piece {
     }
 
     pub fn new(piece_type: PieceType, colour: Colour) -> Self {
-        Self { piece_type, colour }
+        Self {
+            piece_type,
+            colour,
+            has_moved: false,
+        }
     }
 
-    pub fn check_move(&self, board: &Board, m: &Move, by: Colour) -> Result<Coordinate, String> {
+    pub fn check_move(
+        &self,
+        board: &Board,
+        m: Move,
+        by: Colour,
+        en_passant_destination: Option<Coordinate>,
+    ) -> Result<MoveRecord, String> {
         if self.colour != by {
             return Err(String::from("Cannot move opponent's piece"));
         }
+
         if m.from == m.to {
             return Err(String::from("Must move piece"));
         }
-        let taken = board[m.to.row][m.to.column];
-        match taken {
+
+        let destination = board[m.to.row][m.to.column];
+        match destination {
             Some(t) if t.colour == by => {
                 return Err(String::from("Cannot take own piece"));
             }
             _ => {}
         }
-        let destination = Coordinate { ..m.to };
+
+        let first_move = !self.has_moved;
+        let return_move_record = || match destination {
+            Some(taken) => Ok(MoveRecord::TakeMove {
+                m,
+                taken,
+                taken_from: m.to,
+                first_move,
+            }),
+            None => Ok(MoveRecord::SimpleMove { m, first_move }),
+        };
+        let check_path_and_return_move_record = |m| match has_no_pieces_between(board, &m) {
+            Ok(()) => return_move_record(),
+            Err((p, c)) => Err(format!(
+                "Cannot move here: blocked at ({:?}, {:?}), by {:?}",
+                c.row, c.column, p
+            )),
+        };
+
         let d_row = (m.to.row as i8) - (m.from.row as i8);
         let d_column = (m.to.column as i8) - (m.from.column as i8);
-        let check_path = || -> Result<Coordinate, String> {
-            match has_no_pieces_between(board, m) {
-                Ok(()) => Ok(destination),
-                Err((p, c)) => Err(format!(
-                    "Cannot move here: blocked at ({:?}, {:?}), by {:?}",
-                    c.row, c.column, p
-                )),
-            }
-        };
+
+        let row_increment = if by == White { -1 } else { 1 };
         match self.piece_type {
             Pawn => match d_column {
-                0 => match taken {
+                0 => match destination {
                     None => match d_row * if by == White { -1 } else { 1 } {
-                        1 => Ok(destination),
+                        1 => return_move_record(),
                         2 => {
-                            let start_row = if by == White { _2 } else { _7 };
                             let in_between = if by == White { _3 } else { _6 };
-                            if m.from.row == start_row {
+                            if !self.has_moved {
                                 if board[in_between][m.from.column].is_none() {
-                                    Ok(destination)
+                                    return_move_record()
                                 } else {
                                     Err(String::from("Cannot jump with Pawn"))
                                 }
@@ -112,40 +149,101 @@ impl Piece {
                     },
                     Some(_) => Err(String::from("Cannot take with Pawn unless diagonally")),
                 },
-                1 | -1 => match d_row * if by == White { -1 } else { 1 } {
+                1 | -1 => match d_row * row_increment {
                     0 => Err(String::from("Cannot move Pawn horizontally")),
-                    1 => match taken {
-                        Some(_) => Ok(destination),
-                        // TODO: En-Passant
+                    1 => match destination {
+                        Some(_) => return_move_record(),
+                        None if en_passant_destination == Some(m.to) => {
+                            let taken_from = Coordinate {
+                                column: m.to.column,
+                                row: RowIndex::from((m.to.row as i8 - row_increment) as usize),
+                            };
+                            let taken = board[taken_from.row][taken_from.column].unwrap(); // SAFE
+                            Ok(MoveRecord::TakeMove {
+                                m,
+                                taken,
+                                taken_from,
+                                first_move: !self.has_moved,
+                            })
+                        }
                         None => Err(String::from("Cannot move Pawn diagonally unless taking")),
                     },
-                    2..=7 => Err(String::from("Cannot move Pawn here: too far")),
+                    2..=6 => Err(String::from("Cannot move Pawn here: too far")),
                     _ => Err(String::from("Cannot move Pawn here: must move forwards")),
                 },
                 _ => Err(String::from("Cannot move Pawn horizontally")),
             },
             Rook => match (d_row, d_column) {
-                (_, 0) | (0, _) => check_path(),
+                (_, 0) | (0, _) => check_path_and_return_move_record(m),
                 _ => Err(String::from("Cannot move Rook here: not a straight line")),
             },
             Knight => match (i8::abs(d_row), i8::abs(d_column)) {
-                (1, 2) => Ok(destination),
-                (2, 1) => Ok(destination),
+                (1, 2) => return_move_record(),
+                (2, 1) => return_move_record(),
                 _ => Err(String::from("Cannot move Knight here: not in L pattern")),
             },
             Bishop => match (i8::abs(d_row), i8::abs(d_column)) {
-                (r, c) if r == c => check_path(),
+                (r, c) if r == c => check_path_and_return_move_record(m),
                 _ => Err(String::from("Cannot move Bishop here: not a diagonal line")),
             },
             Queen => match (i8::abs(d_row), i8::abs(d_column)) {
-                (_, 0) | (0, _) => check_path(),
-                (r, c) if r == c => check_path(),
+                (_, 0) | (0, _) => check_path_and_return_move_record(m),
+                (r, c) if r == c => check_path_and_return_move_record(m),
                 _ => Err(String::from("Cannot move Queen here: not in a line")),
             },
             King => match (d_row, d_column) {
-                (-1 | 1, -1 | 1 | 0) => Ok(destination),
-                (0, -1 | 1) => Ok(destination),
-                // TODO: Castle
+                (-1 | 1, -1 | 1) => return_move_record(), // Diagonal
+                (-1 | 1, 0) => return_move_record(),      // Vertical
+                (0, -1 | 1) => return_move_record(),      // Horizontal
+                // TODO (Fischer Random support): use Move enum instead of difference by 2
+                (0, direction @ (-2 | 2)) => {
+                    // Castle
+                    // check king has not moved
+                    if self.has_moved {
+                        return Err(String::from("Cannot castle: King has been moved"));
+                    }
+                    // find target rook
+                    let rook_coordinates = Coordinate {
+                        row: m.from.row,
+                        column: if direction == 2 { H } else { A },
+                    };
+                    let rook = match board[rook_coordinates.row][rook_coordinates.column] {
+                        Some(piece) => piece,
+                        None => {
+                            return Err(String::from("Cannot castle: no Rook found"));
+                        }
+                    };
+                    // check target rook has not moved
+                    if rook.has_moved {
+                        return Err(String::from(
+                            "Cannot castle this way: target Rook has been moved",
+                        ));
+                    }
+                    // check that castling does not take a piece (TODO: redundant, except for Fischer?)
+                    if let Some(_) = destination {
+                        return Err(String::from(
+                            "Cannot castle: cannot take piece during castle",
+                        ));
+                    }
+                    // check_path king -> rook
+                    match has_no_pieces_between(board, &m) {
+                        Ok(()) => {
+                            let rook_move = Move {
+                                from: rook_coordinates,
+                                to: Coordinate {
+                                    row: rook_coordinates.row,
+                                    column: if direction == 2 { F } else { D },
+                                },
+                            };
+                            Ok(MoveRecord::CastleMove(m, rook_move))
+                        }
+                        Err((p, c)) => Err(format!(
+                            "Cannot move here: blocked at ({:?}, {:?}), by {:?}",
+                            c.row, c.column, p
+                        )),
+                    }
+                    // TODO: check in-through-out-of-check
+                }
                 _ => Err(String::from("Cannot move King more than one square")),
             },
         }

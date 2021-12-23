@@ -22,6 +22,12 @@ impl RowIndex {
     }
 }
 
+impl From<usize> for RowIndex {
+    fn from(index: usize) -> Self {
+        Self::get_rows()[index]
+    }
+}
+
 impl Display for RowIndex {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", ((8 - *self as u8) + b'0') as char)
@@ -40,23 +46,6 @@ pub enum ColumnIndex {
     H,
 }
 use ColumnIndex::*;
-
-impl ColumnIndex {
-    pub fn parse(c: char) -> Result<Self, String> {
-        let result = match c {
-            'a' | 'A' => A,
-            'b' | 'B' => B,
-            'c' | 'C' => C,
-            'd' | 'D' => D,
-            'e' | 'E' => E,
-            'f' | 'F' => F,
-            'g' | 'G' => G,
-            'h' | 'H' => H,
-            _ => return Err(format!("Invalid Column: {} (must be a-h or A-H)", c)),
-        };
-        Ok(result)
-    }
-}
 
 impl Display for ColumnIndex {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {

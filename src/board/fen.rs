@@ -8,6 +8,7 @@ use crate::parsing::parse_coordinate;
 use super::{
     coordinates::{ColumnIndex, Coordinate},
     grid::Board,
+    moves::MoveRecords,
     piece::Colour,
     BoardState, CastlingAvailability,
     Colour::*,
@@ -160,8 +161,8 @@ impl FromStr for BoardState {
         let board = parse_board(pieces)?;
 
         let moves = match active_player {
-            "B" | "b" => Vec::new(), // TODO: remove this field and replace with next player / number_of full_moves
-            "W" | "w" => Vec::new(), // TODO: remove this field and replace with next player / number_of full_moves
+            "B" | "b" => MoveRecords::new(), // TODO: remove this field and replace with next player / number_of full_moves
+            "W" | "w" => MoveRecords::new(), // TODO: remove this field and replace with next player / number_of full_moves
             _ => {
                 return Err(format!(
                     "FEN PARSE ERROR: next player must be 'b' or 'w' (not {})",
@@ -194,7 +195,7 @@ mod tests {
     fn empty_board() {
         let expect: BoardState = BoardState {
             board: Default::default(),
-            moves: Vec::new(),
+            moves: Default::default(),
             castling_availability: CastlingAvailability(Default::default()),
             en_passant_availability: None,
         };

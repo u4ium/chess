@@ -15,7 +15,7 @@ pub trait Player {
 }
 
 pub fn play_chess(white_player: &dyn Player, black_player: &dyn Player) -> io::Result<()> {
-    let mut board_state = BoardState::new();
+    let mut board_state = BoardState::default();
     let displays = Displays::new(vec![white_player.get_display(), black_player.get_display()]);
     while !board_state.is_checkmate() {
         displays.display_board(&board_state);

@@ -71,7 +71,7 @@ impl Player for InteractiveCliPlayer {
         let m = loop {
             let to = get_coordinate("Move to: ")?;
             let possible_move = Move { from, to };
-            match board_state.is_legal_move(&possible_move) {
+            match board_state.is_legal_move(possible_move) {
                 Ok(()) => {
                     break possible_move;
                 }

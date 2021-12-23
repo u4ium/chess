@@ -25,6 +25,9 @@ pub fn parse_coordinate(input: &str) -> Result<Coordinate, String> {
             ))),
         }
     };
+
+    // TODO: use ColumnIndex::parse()
+
     match input_bytes[0] {
         b'a' | b'A' => parse_row(A),
         b'b' | b'B' => parse_row(B),
@@ -38,5 +41,22 @@ pub fn parse_coordinate(input: &str) -> Result<Coordinate, String> {
             "Invalid column {}",
             input_bytes[0] as char
         ))),
+    }
+}
+
+impl ColumnIndex {
+    pub fn parse(c: char) -> Result<Self, String> {
+        let result = match c {
+            'a' | 'A' => A,
+            'b' | 'B' => B,
+            'c' | 'C' => C,
+            'd' | 'D' => D,
+            'e' | 'E' => E,
+            'f' | 'F' => F,
+            'g' | 'G' => G,
+            'h' | 'H' => H,
+            _ => return Err(format!("Invalid Column: {} (must be a-h or A-H)", c)),
+        };
+        Ok(result)
     }
 }

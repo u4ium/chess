@@ -1,6 +1,4 @@
-use std::convert::TryInto;
-
-use enum_map::{enum_map, EnumMap};
+use enum_map::enum_map;
 
 pub mod piece;
 use piece::*;
@@ -11,15 +9,19 @@ use coordinates::*;
 pub mod grid;
 use grid::*;
 
-mod fen;
+pub mod moves;
+use moves::{
+    CastlingAvailability,
+    MoveRecord::{self, *},
+    MoveRecords,
+};
 
-#[derive(Debug, PartialEq)]
-pub struct CastlingAvailability(EnumMap<Colour, EnumMap<ColumnIndex, bool>>);
+mod fen;
 
 #[derive(Debug, PartialEq)]
 pub struct BoardState {
     pub board: Board,
-    pub moves: Vec<Move>,
+    pub moves: MoveRecords,
     pub castling_availability: CastlingAvailability,
     pub en_passant_availability: Option<Coordinate>,
 }
@@ -144,7 +146,7 @@ impl BoardState {
                     H => Some(Piece::new(Rook, White)),
                 },
             },
-            moves: vec![],
+            moves: MoveRecords::new(),
             castling_availability: CastlingAvailability(enum_map! {
                 White => enum_map!{
                     A => true,
@@ -185,48 +187,81 @@ impl BoardState {
         }
     }
 
-    pub fn try_move(&mut self, m: Move) -> Result<Option<Piece>, String> {
+    pub fn try_move(&mut self, m: Move) -> Result<(), String> {
         let current_player = self.get_next_player();
-
         let piece = self.board[m.from.row][m.from.column];
-        let taken_from = match piece {
-            Some(p) => p.check_move(&self.board, &m, current_player)?,
+        let record = match piece {
+            Some(p) => {
+                p.check_move(&self.board, m, current_player, self.en_passant_availability)?
+            }
             None => {
                 return Err(String::from("No piece found to move"));
             }
         };
-        if self.would_be_check(&m, current_player, taken_from) {
+        if self.would_be_check(&record, current_player) {
             Err(String::from("Cannot move here: Check"))
         } else {
-            Ok(self.do_move(&m, taken_from))
+            Ok(self.do_move(record))
         }
     }
 
-    pub fn do_move(&mut self, m: &Move, taken_from: Coordinate) -> Option<Piece> {
-        let piece = self.board[m.from.row][m.from.column];
-        let taken = self.board[taken_from.row][taken_from.column];
-        self.board[taken_from.row][taken_from.column] = None;
-        self.board[m.to.row][m.to.column] = piece;
-        self.board[m.from.row][m.from.column] = None;
-        self.moves.push(*m);
-        taken
+    pub fn do_move(&mut self, record: MoveRecord) {
+        match record {
+            SimpleMove { m, .. } => {
+                self.board[m.to.row][m.to.column] =
+                    self.board[m.from.row][m.from.column].take().moved(true);
+            }
+            TakeMove { m, taken_from, .. } => {
+                self.board[taken_from.row][taken_from.column] = None;
+                self.board[m.to.row][m.to.column] =
+                    self.board[m.from.row][m.from.column].take().moved(true);
+            }
+            CastleMove(m1, m2) => {
+                self.board[m1.to.row][m1.to.column] =
+                    self.board[m1.from.row][m1.from.column].take().moved(true);
+                self.board[m2.to.row][m2.to.column] =
+                    self.board[m2.from.row][m2.from.column].take().moved(true);
+            }
+        }
+        self.moves.push(record);
+        self.recompute_en_passant_availability();
     }
 
     /// Note: Panics if self.moves is empty
-    pub fn undo_move(&mut self, taken_from: Coordinate, taken: Option<Piece>) {
-        let m = self.moves.pop().unwrap_or_else(|| {
+    pub fn undo_move(&mut self) {
+        let record = self.moves.pop().unwrap_or_else(|| {
             panic!("ERROR: Cannot undo moves, since none have been made");
         });
-        let piece = self.board[m.to.row][m.to.column];
-        self.board[m.to.row][m.to.column] = None;
-        self.board[taken_from.row][taken_from.column] = taken;
-        self.board[m.from.row][m.from.column] = piece;
+        match record {
+            SimpleMove { m, first_move } => {
+                self.board[m.from.row][m.from.column] =
+                    self.board[m.to.row][m.to.column].take().moved(!first_move);
+            }
+            TakeMove {
+                m,
+                taken,
+                taken_from,
+                first_move,
+            } => {
+                self.board[m.from.row][m.from.column] =
+                    self.board[m.to.row][m.to.column].take().moved(!first_move);
+                self.board[taken_from.row][taken_from.column] = Some(taken);
+            }
+            CastleMove(m1, m2) => {
+                self.board[m1.from.row][m1.from.column] =
+                    self.board[m1.to.row][m1.to.column].take().moved(false);
+                self.board[m2.from.row][m2.from.column] =
+                    self.board[m2.to.row][m2.to.column].take().moved(false);
+            }
+        }
+        self.recompute_en_passant_availability();
     }
 
     pub fn is_checkmate(&mut self) -> bool {
         let player = self.get_next_player();
         self.is_in_check(player) && self.get_legal_moves(player).len() == 0
     }
+
     /// Note: will panic if King is not found
     pub fn is_in_check(&self, player: Colour) -> bool {
         let (&row, &column) = self.find_king(player).unwrap_or_else(|| {
@@ -237,23 +272,14 @@ impl BoardState {
         checking_moves.len() > 0
     }
 
-    fn find_king(&self, player: Colour) -> Option<(&RowIndex, &ColumnIndex)> {
-        board_iterator().find(|(&r, &c)| match self.board[r][c] {
-            Some(Piece {
-                piece_type: King,
-                colour,
-            }) if colour == player => true,
-            _ => false,
-        })
-    }
     pub fn get_legal_moves_from(&mut self, from: Coordinate, by: Colour) -> Vec<Move> {
         match self.board[from.row][from.column] {
             Some(piece) if piece.colour == by => board_iterator()
                 .filter_map(|(&row, &column)| {
                     let to = Coordinate { row, column };
                     let m = Move { from, to };
-                    match piece.check_move(&self.board, &m, by) {
-                        Ok(taken_from) if !self.would_be_check(&m, by, taken_from) => Some(m),
+                    match piece.check_move(&self.board, m, by, self.en_passant_availability) {
+                        Ok(record) if !self.would_be_check(&record, by) => Some(m),
                         _ => None,
                     }
                 })
@@ -262,22 +288,20 @@ impl BoardState {
         }
     }
 
-    /// Note: Some of these moves may result in Check
-    fn get_moves_to(&self, to: Coordinate, by: Colour) -> Vec<Coordinate> {
-        board_iterator()
-            .filter_map(|(&row, &column)| match self.board[row][column] {
-                Some(piece) if piece.colour == by => {
-                    let from = Coordinate { row, column };
-                    let m = Move { from, to };
-                    if piece.check_move(&self.board, &m, by).is_ok() {
-                        Some(from)
-                    } else {
-                        None
-                    }
+    pub fn is_legal_move(&mut self, m: Move) -> Result<(), String> {
+        let player = self.get_next_player();
+        match self.board[m.from.row][m.from.column] {
+            None => Err(String::from("No piece to move")),
+            Some(piece) => {
+                let record =
+                    piece.check_move(&self.board, m, player, self.en_passant_availability)?;
+                if !self.would_be_check(&record, player) {
+                    Ok(())
+                } else {
+                    Err(String::from("Cannot move here: Check"))
                 }
-                _ => None,
-            })
-            .collect()
+            }
+        }
     }
 
     /// Note: Expensive operation
@@ -303,27 +327,48 @@ impl BoardState {
             .flatten()
             .collect()
     }
-    fn would_be_check(&mut self, m: &Move, by: Colour, taken_from: Coordinate) -> bool {
-        // TODO: add taken (En-Passant)
-        let taken = self.do_move(m, taken_from);
-        let result = self.is_in_check(by);
-        self.undo_move(taken_from, taken);
-        result
+
+    /// Note: Some of these moves may result in Check
+    fn get_moves_to(&self, to: Coordinate, by: Colour) -> Vec<Coordinate> {
+        board_iterator()
+            .filter_map(|(&row, &column)| match self.board[row][column] {
+                Some(piece) if piece.colour == by => {
+                    let from = Coordinate { row, column };
+                    let m = Move { from, to };
+                    if piece
+                        .check_move(&self.board, m, by, self.en_passant_availability)
+                        .is_ok()
+                    {
+                        Some(from)
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            })
+            .collect()
     }
 
-    pub fn is_legal_move(&mut self, m: &Move) -> Result<(), String> {
-        let player = self.get_next_player();
-        match self.board[m.from.row][m.from.column] {
-            None => Err(String::from("No piece to move")),
-            Some(piece) => {
-                let taken_from = piece.check_move(&self.board, m, player)?;
-                if !self.would_be_check(&m, player, taken_from) {
-                    Ok(())
-                } else {
-                    Err(String::from("Cannot move here: Check"))
-                }
-            }
-        }
+    fn recompute_en_passant_availability(&mut self) {
+        self.en_passant_availability = self.moves.get_en_passant_availability(&self.board);
+    }
+
+    fn find_king(&self, player: Colour) -> Option<(&RowIndex, &ColumnIndex)> {
+        board_iterator().find(|(&r, &c)| match self.board[r][c] {
+            Some(Piece {
+                piece_type: King,
+                colour,
+                ..
+            }) if colour == player => true,
+            _ => false,
+        })
+    }
+
+    fn would_be_check(&mut self, record: &MoveRecord, by: Colour) -> bool {
+        self.do_move(*record);
+        let result = self.is_in_check(by);
+        self.undo_move();
+        result
     }
 }
 

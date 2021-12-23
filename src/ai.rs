@@ -2,10 +2,7 @@ use crate::{
     board::{
         coordinates::{ColumnIndex::*, Move, RowIndex::*},
         grid::board_iterator,
-        piece::{
-            Colour::{self, *},
-            PieceType::*,
-        },
+        piece::Colour::{self, *},
         BoardState,
     },
     display::Display,
@@ -60,14 +57,16 @@ fn get_best_move(board_state: &mut BoardState, depth: u8) -> Move {
         };
         let mut result = (None, worst);
         for m in state.get_legal_moves(current_player) {
-            let taken_from = match state.board[m.from.row][m.from.column] {
-                Some(piece) if piece.piece_type == Pawn => {
-                    // En-Passant: taken piece may not be at the "to" coordinate
-                    piece.check_move(&state.board, &m, current_player).unwrap() // SAFE
-                }
-                _ => m.to,
-            };
-            let taken = state.do_move(&m, taken_from);
+            let record = state.board[m.from.row][m.from.column]
+                .unwrap() // SAFE
+                .check_move(
+                    &state.board,
+                    m,
+                    current_player,
+                    state.en_passant_availability,
+                )
+                .unwrap(); // SAFE
+            state.do_move(record);
             match current_player {
                 White => {
                     let (_, value) = rec_helper(state, depth - 1, current_best, other_best);
@@ -76,7 +75,7 @@ fn get_best_move(board_state: &mut BoardState, depth: u8) -> Move {
                         result.1 = value;
                     }
                     if value >= other_best {
-                        state.undo_move(taken_from, taken);
+                        state.undo_move();
                         return result;
                     }
                     if value > current_best {
@@ -90,7 +89,7 @@ fn get_best_move(board_state: &mut BoardState, depth: u8) -> Move {
                         result.1 = value;
                     }
                     if value <= other_best {
-                        state.undo_move(taken_from, taken);
+                        state.undo_move();
                         return result;
                     }
                     if value < current_best {
@@ -98,7 +97,7 @@ fn get_best_move(board_state: &mut BoardState, depth: u8) -> Move {
                     }
                 }
             }
-            state.undo_move(taken_from, taken);
+            state.undo_move();
         }
         result
     }
