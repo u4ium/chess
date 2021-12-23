@@ -35,7 +35,7 @@ pub fn other_player(player: Colour) -> Colour {
 pub struct Piece {
     pub piece_type: PieceType,
     pub colour: Colour,
-    has_moved: bool,
+    pub has_moved: bool,
 }
 
 pub trait Movable {

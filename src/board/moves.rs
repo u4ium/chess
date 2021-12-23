@@ -3,7 +3,10 @@ use std::ops::{Deref, DerefMut};
 use super::{
     coordinates::{ColumnIndex, Coordinate, Move, RowIndex},
     grid::Board,
-    piece::{Colour, Piece, PieceType::Pawn},
+    piece::{
+        Colour, Piece,
+        PieceType::{self, Pawn},
+    },
 };
 use enum_map::EnumMap;
 
@@ -29,6 +32,14 @@ pub enum MoveRecord {
         first_move: bool,
     },
     CastleMove(Move, Move),
+    PawnPromotion {
+        /// the move that mas made
+        m: Move,
+        /// the type of piece the Pawn was promoted to
+        to: PieceType,
+        /// optionally, the piece that was taken by this Pawn
+        taken: Option<Piece>,
+    },
 }
 
 pub enum CastleDirection {
@@ -38,6 +49,7 @@ pub enum CastleDirection {
 
 // TODO: use for public API: check_move
 pub enum MoveSignal {
+    Undo,
     Retire,
     ForceDraw,
     RequestDraw,
@@ -63,33 +75,32 @@ impl MoveRecords {
                     if let Pawn = piece.piece_type {
                         let from_row_index = m.from.row as i8;
                         let to_row_index = m.to.row as i8;
-                        if to_row_index - from_row_index == 2 {
-                            let in_between = Coordinate {
-                                row: RowIndex::from((from_row_index + 1) as usize),
-                                column: m.to.column,
-                            };
-                            Some(in_between)
-                        } else if to_row_index - from_row_index == -2 {
-                            let in_between = Coordinate {
-                                row: RowIndex::from((from_row_index - 1) as usize),
-                                column: m.to.column,
-                            };
-                            Some(in_between)
-                        } else {
-                            None // Only a double PawnMove can precede an en-passant
+                        let row_diff = to_row_index - from_row_index;
+                        if row_diff.abs() != 2 {
+                            return None; // Only a double PawnMove can precede an en-passant
                         }
+                        let step = row_diff / 2; // A step in the direction of the double move
+                        let in_between = Coordinate {
+                            row: RowIndex::from((from_row_index + step) as usize),
+                            column: m.to.column,
+                        };
+                        Some(in_between)
                     } else {
                         None // Only a PawnMove can precede an en-passant
                     }
                 }
                 _ => {
-                    None // CastleMoves and TakeMoves cannot precede en-passant
+                    None // CastleMoves, TakeMoves and PawnPromotions cannot precede en-passant
                 }
             }
         } else {
             // TODO: use start state
             None
         }
+    }
+
+    pub fn can_undo(&self) -> bool {
+        self.0.len() > 0
     }
 }
 

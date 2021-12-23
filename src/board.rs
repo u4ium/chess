@@ -222,6 +222,10 @@ impl BoardState {
                 self.board[m2.to.row][m2.to.column] =
                     self.board[m2.from.row][m2.from.column].take().moved(true);
             }
+            PawnPromotion { m, to, .. } => {
+                self.board[m.from.row][m.from.column] = None;
+                self.board[m.to.row][m.to.column] = Some(Piece::new(to, self.get_next_player()));
+            }
         }
         self.moves.push(record);
         self.recompute_en_passant_availability();
@@ -252,6 +256,14 @@ impl BoardState {
                     self.board[m1.to.row][m1.to.column].take().moved(false);
                 self.board[m2.from.row][m2.from.column] =
                     self.board[m2.to.row][m2.to.column].take().moved(false);
+            }
+            PawnPromotion { m, taken, .. } => {
+                self.board[m.to.row][m.to.column] = taken;
+                self.board[m.from.row][m.from.column] = Some(Piece {
+                    piece_type: Pawn,
+                    colour: self.get_other_player(),
+                    has_moved: true,
+                });
             }
         }
         self.recompute_en_passant_availability();
