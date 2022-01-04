@@ -1,3 +1,5 @@
+use std::collections::{HashMap, HashSet};
+
 use enum_map::enum_map;
 
 pub mod piece;
@@ -233,9 +235,10 @@ impl BoardState {
 
     /// Note: Panics if self.moves is empty
     pub fn undo_move(&mut self) {
-        let record = self.moves.pop().unwrap_or_else(|| {
-            panic!("ERROR: Cannot undo moves, since none have been made");
-        });
+        let record = self
+            .moves
+            .pop()
+            .expect("ERROR: Cannot undo moves, since none have been made");
         match record {
             SimpleMove { m, first_move } => {
                 self.board[m.from.row][m.from.column] =
@@ -276,9 +279,9 @@ impl BoardState {
 
     /// Note: will panic if King is not found
     pub fn is_in_check(&self, player: Colour) -> bool {
-        let (&row, &column) = self.find_king(player).unwrap_or_else(|| {
-            panic!("{:?} King not found {:#?}", player, self.board);
-        });
+        let (&row, &column) = self
+            .find_king(player)
+            .expect(&format!("{:?} King not found {:#?}", player, self.board)[..]);
         let king_coordinates = Coordinate { row, column };
         let checking_moves = self.get_moves_to(king_coordinates, other_player(player));
         checking_moves.len() > 0
@@ -338,6 +341,15 @@ impl BoardState {
             .map(|(&row, &column)| self.get_legal_moves_from(Coordinate { row, column }, by))
             .flatten()
             .collect()
+    }
+
+    pub fn get_legal_moves_map(&mut self, by: Colour) -> HashMap<Coordinate, HashSet<Coordinate>> {
+        self.get_legal_moves(by)
+            .into_iter()
+            .fold(Default::default(), |mut a, m| {
+                a.entry(m.from).or_default().insert(m.to);
+                a
+            })
     }
 
     /// Note: Some of these moves may result in Check

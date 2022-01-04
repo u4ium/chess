@@ -68,7 +68,8 @@ impl Piece {
             'q' | '♛' => Piece::new(Queen, Black),
             'k' | '♚' => Piece::new(King, Black),
 
-            '_' | ' ' => return Ok(None),
+            '_' | ' ' | '◻' | '◼' => return Ok(None),
+
             _ => return Err(format!("Invalid character for square {}", c)),
         };
         Ok(Some(square))
@@ -97,8 +98,8 @@ impl Piece {
             return Err(String::from("Must move piece"));
         }
 
-        let destination = board[m.to.row][m.to.column];
-        match destination {
+        let destination_square = board[m.to.row][m.to.column];
+        match destination_square {
             Some(t) if t.colour == by => {
                 return Err(String::from("Cannot take own piece"));
             }
@@ -106,7 +107,7 @@ impl Piece {
         }
 
         let first_move = !self.has_moved;
-        let return_move_record = || match destination {
+        let return_move_record = || match destination_square {
             Some(taken) => Ok(MoveRecord::TakeMove {
                 m,
                 taken,
@@ -126,12 +127,23 @@ impl Piece {
         let d_row = (m.to.row as i8) - (m.from.row as i8);
         let d_column = (m.to.column as i8) - (m.from.column as i8);
 
+        let end_row = if by == White { _8 } else { _1 };
         let row_increment = if by == White { -1 } else { 1 };
         match self.piece_type {
             Pawn => match d_column {
-                0 => match destination {
+                0 => match destination_square {
                     None => match d_row * if by == White { -1 } else { 1 } {
-                        1 => return_move_record(),
+                        1 => {
+                            if m.to.row == end_row {
+                                Ok(MoveRecord::PawnPromotion {
+                                    m,
+                                    to: Queen, // TODO
+                                    taken: None,
+                                })
+                            } else {
+                                return_move_record()
+                            }
+                        }
                         2 => {
                             let in_between = if by == White { _3 } else { _6 };
                             if !self.has_moved {
@@ -151,8 +163,18 @@ impl Piece {
                 },
                 1 | -1 => match d_row * row_increment {
                     0 => Err(String::from("Cannot move Pawn horizontally")),
-                    1 => match destination {
-                        Some(_) => return_move_record(),
+                    1 => match destination_square {
+                        Some(taken_piece) => {
+                            if m.to.row == end_row {
+                                Ok(MoveRecord::PawnPromotion {
+                                    m,
+                                    to: Queen, // TODO
+                                    taken: Some(taken_piece),
+                                })
+                            } else {
+                                return_move_record()
+                            }
+                        }
                         None if en_passant_destination == Some(m.to) => {
                             let taken_from = Coordinate {
                                 column: m.to.column,
@@ -171,7 +193,10 @@ impl Piece {
                     2..=6 => Err(String::from("Cannot move Pawn here: too far")),
                     _ => Err(String::from("Cannot move Pawn here: must move forwards")),
                 },
-                _ => Err(String::from("Cannot move Pawn horizontally")),
+                _ => match d_row {
+                    0 => Err(String::from("Cannot move Pawn horizontally")),
+                    _ => Err(String::from("Cannot move Pawn this way")),
+                },
             },
             Rook => match (d_row, d_column) {
                 (_, 0) | (0, _) => check_path_and_return_move_record(m),
@@ -220,7 +245,7 @@ impl Piece {
                         ));
                     }
                     // check that castling does not take a piece (TODO: redundant, except for Fischer?)
-                    if let Some(_) = destination {
+                    if let Some(_) = destination_square {
                         return Err(String::from(
                             "Cannot castle: cannot take piece during castle",
                         ));
