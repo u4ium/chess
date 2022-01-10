@@ -57,15 +57,9 @@ fn get_best_move(board_state: &mut BoardState, depth: u8) -> Move {
         };
         let mut result = (None, worst);
         for m in state.get_legal_moves(current_player) {
-            let record = state.board[m.from.row][m.from.column]
-                .unwrap() // SAFE
-                .check_move(
-                    &state.board,
-                    m,
-                    current_player,
-                    state.en_passant_availability,
-                )
-                .unwrap(); // SAFE
+            let record = state
+                .get_move_result(m, current_player)
+                .expect("A legal move should be legal");
             state.do_move(record);
             match current_player {
                 White => {
