@@ -1,14 +1,121 @@
-use enum_map::EnumMap;
+use enum_map::{enum_map, EnumMap};
 use itertools::{Itertools, Product};
-use std::iter::repeat;
+use std::ops::{Deref, DerefMut};
 use std::slice;
 
 use crate::board::coordinates::*;
 use crate::board::piece::*;
+use Colour::*;
+use ColumnIndex::*;
+use PieceType::*;
+use RowIndex::*;
 
 pub type Square = Option<Piece>;
 pub type Row = EnumMap<ColumnIndex, Square>;
-pub type Board = EnumMap<RowIndex, Row>;
+pub type BoardMap = EnumMap<RowIndex, Row>;
+
+#[derive(Debug, PartialEq, Default)]
+pub struct Board(pub BoardMap);
+
+impl Board {
+    pub fn new() -> Self {
+        Board(enum_map! {
+            _8 => enum_map!{
+                A => Some(Piece::new(Rook, Black)),
+                B => Some(Piece::new(Knight, Black)),
+                C => Some(Piece::new(Bishop, Black)),
+                D => Some(Piece::new(Queen, Black)),
+                E => Some(Piece::new(King, Black)),
+                F => Some(Piece::new(Bishop, Black)),
+                G => Some(Piece::new(Knight, Black)),
+                H => Some(Piece::new(Rook, Black)),
+            },
+            _7 => enum_map!{
+                A => Some(Piece::new(Pawn, Black)),
+                B => Some(Piece::new(Pawn, Black)),
+                C => Some(Piece::new(Pawn, Black)),
+                D => Some(Piece::new(Pawn, Black)),
+                E => Some(Piece::new(Pawn, Black)),
+                F => Some(Piece::new(Pawn, Black)),
+                G => Some(Piece::new(Pawn, Black)),
+                H => Some(Piece::new(Pawn, Black)),
+            },
+            _6 => enum_map!{
+                A => None,
+                B => None,
+                C => None,
+                D => None,
+                E => None,
+                F => None,
+                G => None,
+                H => None,
+            },
+            _5 => enum_map!{
+                A => None,
+                B => None,
+                C => None,
+                D => None,
+                E => None,
+                F => None,
+                G => None,
+                H => None,
+            },
+            _4 => enum_map!{
+                A => None,
+                B => None,
+                C => None,
+                D => None,
+                E => None,
+                F => None,
+                G => None,
+                H => None,
+            },
+            _3 => enum_map!{
+                A => None,
+                B => None,
+                C => None,
+                D => None,
+                E => None,
+                F => None,
+                G => None,
+                H => None,
+            },
+            _2 => enum_map!{
+                A => Some(Piece::new(Pawn, White)),
+                B => Some(Piece::new(Pawn, White)),
+                C => Some(Piece::new(Pawn, White)),
+                D => Some(Piece::new(Pawn, White)),
+                E => Some(Piece::new(Pawn, White)),
+                F => Some(Piece::new(Pawn, White)),
+                G => Some(Piece::new(Pawn, White)),
+                H => Some(Piece::new(Pawn, White)),
+            },
+            _1 => enum_map!{
+                A => Some(Piece::new(Rook, White)),
+                B => Some(Piece::new(Knight, White)),
+                C => Some(Piece::new(Bishop, White)),
+                D => Some(Piece::new(Queen, White)),
+                E => Some(Piece::new(King, White)),
+                F => Some(Piece::new(Bishop, White)),
+                G => Some(Piece::new(Knight, White)),
+                H => Some(Piece::new(Rook, White)),
+            },
+        })
+    }
+}
+
+impl Deref for Board {
+    type Target = BoardMap;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for Board {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
 
 type BoardIterator = Product<slice::Iter<'static, RowIndex>, slice::Iter<'static, ColumnIndex>>;
 pub fn board_iterator() -> BoardIterator {
@@ -17,154 +124,12 @@ pub fn board_iterator() -> BoardIterator {
         .cartesian_product(ColumnIndex::get_columns().iter())
 }
 
-/// Return the coordinates between m.from and m.to
-///
-/// REQ: m is in a straight line
-///
-/// EXAMPLES:
-/// ```
-/// use chess::{RowIndex::*, ColumnIndex::*, Coordinate, Move, squares_between};
-/// let m = Move {
-///     from: Coordinate {row: _1, column: A},
-///     to: Coordinate {row: _4, column: D},
-/// };
-/// assert_eq!(squares_between(&m), vec![
-///     Coordinate {row: _2, column: B},
-///     Coordinate {row: _3, column: C}
-/// ]);
-/// ```
-/// ```
-/// use chess::{RowIndex::*, ColumnIndex::*, Coordinate, Move, squares_between};
-/// let m = Move {
-///     from: Coordinate {row: _7, column: G},
-///     to: Coordinate {row: _4, column: D},
-/// };
-/// assert_eq!(squares_between(&m), vec![
-///     Coordinate {row: _6, column: F},
-///     Coordinate {row: _5, column: E}
-/// ]);
-/// ```
-/// ```
-/// use chess::{RowIndex::*, ColumnIndex::*, Coordinate, Move, squares_between};
-/// let m = Move {
-///     from: Coordinate {row: _7, column: G},
-///     to: Coordinate {row: _4, column: G},
-/// };
-/// assert_eq!(squares_between(&m), vec![
-///     Coordinate {row: _6, column: G},
-///     Coordinate {row: _5, column: G}
-/// ]);
-/// ```
-/// ```
-/// use chess::{RowIndex::*, ColumnIndex::*, Coordinate, Move, squares_between};
-/// let m = Move {
-///     from: Coordinate {row: _7, column: G},
-///     to: Coordinate {row: _7, column: D},
-/// };
-/// assert_eq!(squares_between(&m), vec![
-///     Coordinate {row: _7, column: F},
-///     Coordinate {row: _7, column: E}
-/// ]);
-/// ```
-/// ```
-/// use chess::{RowIndex::*, ColumnIndex::*, Coordinate, Move, squares_between};
-/// let m = Move {
-///     from: Coordinate {row: _7, column: D},
-///     to: Coordinate {row: _7, column: G},
-/// };
-/// assert_eq!(squares_between(&m), vec![
-///     Coordinate {row: _7, column: E},
-///     Coordinate {row: _7, column: F}
-/// ]);
-/// ```
-/// ```
-/// use chess::{RowIndex::*, ColumnIndex::*, Coordinate, Move, squares_between};
-/// let m = Move {
-///     from: Coordinate {row: _1, column: A},
-///     to: Coordinate {row: _2, column: B},
-/// };
-/// assert_eq!(squares_between(&m), vec![]);
-/// ```
-pub fn squares_between(m: &Move) -> Vec<Coordinate> {
-    // Columns
-    let to_column = m.to.column as usize;
-    let from_column = m.from.column as usize;
-    let columns = if from_column > to_column {
-        &ColumnIndex::get_columns()[to_column + 1..from_column]
-    } else if from_column < to_column {
-        &ColumnIndex::get_columns()[from_column + 1..to_column]
-    } else {
-        &[]
-    };
-    // Rows
-    let to_row = m.to.row as usize;
-    let from_row = m.from.row as usize;
-    let rows = if from_row > to_row {
-        &RowIndex::get_rows()[to_row + 1..from_row]
-    } else if from_row < to_row {
-        &RowIndex::get_rows()[from_row + 1..to_row]
-    } else {
-        &[]
-    };
-
-    let to_coordinate = |(row, column): (&RowIndex, &ColumnIndex)| Coordinate {
-        row: *row,
-        column: *column,
-    };
-    // Equate sizes, reverse if needed, zip and map to Coordinates
-    if (rows.len() == 0) ^ (columns.len() == 0) {
-        if rows.len() == 0 {
-            let e = &RowIndex::get_rows()[from_row];
-            if from_column > to_column {
-                repeat(e)
-                    .zip(columns.iter().rev())
-                    .map(to_coordinate)
-                    .collect()
-            } else {
-                repeat(e).zip(columns.iter()).map(to_coordinate).collect()
-            }
-        } else {
-            let e = &ColumnIndex::get_columns()[from_column];
-            if from_row > to_row {
-                rows.iter()
-                    .rev()
-                    .zip(repeat(e))
-                    .map(to_coordinate)
-                    .collect()
-            } else {
-                rows.iter().zip(repeat(e)).map(to_coordinate).collect()
-            }
-        }
-    } else {
-        match (from_column > to_column, from_row > to_row) {
-            (true, true) => rows
-                .iter()
-                .rev()
-                .zip(columns.iter().rev())
-                .map(to_coordinate)
-                .collect(),
-            (true, false) => rows
-                .iter()
-                .zip(columns.iter().rev())
-                .map(to_coordinate)
-                .collect(),
-            (false, true) => rows
-                .iter()
-                .rev()
-                .zip(columns.iter())
-                .map(to_coordinate)
-                .collect(),
-            (false, false) => rows.iter().zip(columns.iter()).map(to_coordinate).collect(),
-        }
-    }
-}
-
 /// REQ: m is in a straight line
 pub fn has_no_pieces_between<'a>(
     board: &'a Board,
     m: &Move,
 ) -> Result<(), (&'a Piece, Coordinate)> {
-    for coordinate in squares_between(m) {
+    for coordinate in m.squares_between() {
         match &board[coordinate.row][coordinate.column] {
             None => {}
             Some(piece) => {

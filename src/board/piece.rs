@@ -1,6 +1,9 @@
 use enum_map::Enum;
 
-use std::fmt::{self, Display, Formatter};
+use std::{
+    fmt::{self, Display, Formatter},
+    ops::Not,
+};
 
 use crate::board::{coordinates::*, grid::*, MoveRecord};
 use ColumnIndex::*;
@@ -24,10 +27,38 @@ pub enum Colour {
 }
 use Colour::*;
 
-pub fn other_player(player: Colour) -> Colour {
-    match player {
-        White => Black,
-        Black => White,
+use super::moves::CastlingAvailability;
+
+impl Not for Colour {
+    type Output = Self;
+
+    fn not(self) -> Self::Output {
+        match self {
+            White => Black,
+            Black => White,
+        }
+    }
+}
+
+impl Default for Colour {
+    fn default() -> Self {
+        White
+    }
+}
+
+impl Colour {
+    pub fn home_rank(&self) -> RowIndex {
+        match self {
+            White => _1,
+            Black => _8,
+        }
+    }
+
+    pub fn home_pawn_rank(&self) -> RowIndex {
+        match self {
+            White => _2,
+            Black => _7,
+        }
     }
 }
 
@@ -40,6 +71,12 @@ pub struct Piece {
 
 pub trait Movable {
     fn moved(self, moved: bool) -> Self;
+    fn guess_and_set_is_moved(
+        &mut self,
+        rank: RowIndex,
+        file: ColumnIndex,
+        castling_availability: &CastlingAvailability,
+    );
 }
 
 impl Movable for Option<Piece> {
@@ -48,6 +85,28 @@ impl Movable for Option<Piece> {
             piece.has_moved = moved;
             Some(piece)
         })
+    }
+
+    fn guess_and_set_is_moved(
+        &mut self,
+        rank: RowIndex,
+        file: ColumnIndex,
+        castling_availability: &CastlingAvailability,
+    ) {
+        if let Some(piece) = self {
+            match piece.piece_type {
+                Rook => {
+                    // assume a Rook has moved iff it is not available to castle (in principal)
+                    piece.has_moved = !castling_availability[piece.colour][file];
+                }
+                Pawn => {
+                    // assume a Pawn has moved iff it is not on its home rank
+                    piece.has_moved = piece.colour.home_pawn_rank() != rank;
+                }
+                // assume other all pieces are moved
+                _ => piece.has_moved = true,
+            }
+        }
     }
 }
 
@@ -260,7 +319,10 @@ impl Piece {
                                     column: if direction == 2 { F } else { D },
                                 },
                             };
-                            Ok(MoveRecord::CastleMove(m, rook_move))
+                            Ok(MoveRecord::CastleMove {
+                                king_move: m,
+                                rook_move,
+                            })
                         }
                         Err((p, c)) => Err(format!(
                             "Cannot move here: blocked at ({:?}, {:?}), by {:?}",

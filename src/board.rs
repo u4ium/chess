@@ -1,7 +1,5 @@
 use std::collections::{HashMap, HashSet};
 
-use enum_map::enum_map;
-
 pub mod piece;
 use piece::*;
 
@@ -22,16 +20,14 @@ mod fen;
 
 #[derive(Debug, PartialEq)]
 pub struct BoardState {
+    pub current_player: Colour,
     pub board: Board,
     pub moves: MoveRecords,
-    pub castling_availability: CastlingAvailability,
     pub en_passant_availability: Option<Coordinate>,
 }
 
 use Colour::*;
-use ColumnIndex::*;
 use PieceType::*;
-use RowIndex::*;
 
 impl BoardState {
     // pub fn from_array(array: [[char; 8]; 8], player: Colour) -> Result<BoardState, String> {
@@ -66,127 +62,19 @@ impl BoardState {
 
     pub fn new() -> BoardState {
         BoardState {
-            board: enum_map! {
-                _8 => enum_map!{
-                    A => Some(Piece::new(Rook, Black)),
-                    B => Some(Piece::new(Knight, Black)),
-                    C => Some(Piece::new(Bishop, Black)),
-                    D => Some(Piece::new(Queen, Black)),
-                    E => Some(Piece::new(King, Black)),
-                    F => Some(Piece::new(Bishop, Black)),
-                    G => Some(Piece::new(Knight, Black)),
-                    H => Some(Piece::new(Rook, Black)),
-                },
-                _7 => enum_map!{
-                    A => Some(Piece::new(Pawn, Black)),
-                    B => Some(Piece::new(Pawn, Black)),
-                    C => Some(Piece::new(Pawn, Black)),
-                    D => Some(Piece::new(Pawn, Black)),
-                    E => Some(Piece::new(Pawn, Black)),
-                    F => Some(Piece::new(Pawn, Black)),
-                    G => Some(Piece::new(Pawn, Black)),
-                    H => Some(Piece::new(Pawn, Black)),
-                },
-                _6 => enum_map!{
-                    A => None,
-                    B => None,
-                    C => None,
-                    D => None,
-                    E => None,
-                    F => None,
-                    G => None,
-                    H => None,
-                },
-                _5 => enum_map!{
-                    A => None,
-                    B => None,
-                    C => None,
-                    D => None,
-                    E => None,
-                    F => None,
-                    G => None,
-                    H => None,
-                },
-                _4 => enum_map!{
-                    A => None,
-                    B => None,
-                    C => None,
-                    D => None,
-                    E => None,
-                    F => None,
-                    G => None,
-                    H => None,
-                },
-                _3 => enum_map!{
-                    A => None,
-                    B => None,
-                    C => None,
-                    D => None,
-                    E => None,
-                    F => None,
-                    G => None,
-                    H => None,
-                },
-                _2 => enum_map!{
-                    A => Some(Piece::new(Pawn, White)),
-                    B => Some(Piece::new(Pawn, White)),
-                    C => Some(Piece::new(Pawn, White)),
-                    D => Some(Piece::new(Pawn, White)),
-                    E => Some(Piece::new(Pawn, White)),
-                    F => Some(Piece::new(Pawn, White)),
-                    G => Some(Piece::new(Pawn, White)),
-                    H => Some(Piece::new(Pawn, White)),
-                },
-                _1 => enum_map!{
-                    A => Some(Piece::new(Rook, White)),
-                    B => Some(Piece::new(Knight, White)),
-                    C => Some(Piece::new(Bishop, White)),
-                    D => Some(Piece::new(Queen, White)),
-                    E => Some(Piece::new(King, White)),
-                    F => Some(Piece::new(Bishop, White)),
-                    G => Some(Piece::new(Knight, White)),
-                    H => Some(Piece::new(Rook, White)),
-                },
-            },
-            moves: MoveRecords::new(),
-            castling_availability: CastlingAvailability(enum_map! {
-                White => enum_map!{
-                    A => true,
-                    B => false,
-                    C => false,
-                    D => false,
-                    E => false,
-                    F => false,
-                    G => false,
-                    H => true,
-                },
-                Black => enum_map!{
-                    A => true,
-                    B => false,
-                    C => false,
-                    D => false,
-                    E => false,
-                    F => false,
-                    G => false,
-                    H => true,
-                },
-            }),
+            current_player: White,
+            board: Board::new(),
+            moves: MoveRecords::new(None),
             en_passant_availability: None,
         }
     }
 
     pub fn get_next_player(&self) -> Colour {
-        match self.moves.len() % 2 {
-            0 => White,
-            _ => Black,
-        }
+        self.current_player
     }
 
     pub fn get_other_player(&self) -> Colour {
-        match self.moves.len() % 2 {
-            0 => Black,
-            _ => White,
-        }
+        !self.current_player
     }
 
     pub fn try_move(&mut self, m: Move) -> Result<(), String> {
@@ -218,18 +106,30 @@ impl BoardState {
                 self.board[m.to.row][m.to.column] =
                     self.board[m.from.row][m.from.column].take().moved(true);
             }
-            CastleMove(m1, m2) => {
-                self.board[m1.to.row][m1.to.column] =
-                    self.board[m1.from.row][m1.from.column].take().moved(true);
-                self.board[m2.to.row][m2.to.column] =
-                    self.board[m2.from.row][m2.from.column].take().moved(true);
+            CastleMove {
+                rook_move,
+                king_move,
+            } => {
+                self.board[rook_move.to.row][rook_move.to.column] = self.board[rook_move.from.row]
+                    [rook_move.from.column]
+                    .take()
+                    .moved(true);
+                self.board[king_move.to.row][king_move.to.column] = self.board[king_move.from.row]
+                    [king_move.from.column]
+                    .take()
+                    .moved(true);
             }
             PawnPromotion { m, to, .. } => {
                 self.board[m.from.row][m.from.column] = None;
-                self.board[m.to.row][m.to.column] = Some(Piece::new(to, self.get_next_player()));
+                self.board[m.to.row][m.to.column] = Some(Piece {
+                    piece_type: to,
+                    colour: self.current_player,
+                    has_moved: true,
+                });
             }
         }
-        self.moves.push(record);
+        self.current_player = !self.current_player;
+        self.moves.record_move(record);
         self.recompute_en_passant_availability();
     }
 
@@ -237,7 +137,7 @@ impl BoardState {
     pub fn undo_move(&mut self) {
         let record = self
             .moves
-            .pop()
+            .pop_last_move()
             .expect("ERROR: Cannot undo moves, since none have been made");
         match record {
             SimpleMove { m, first_move } => {
@@ -254,21 +154,29 @@ impl BoardState {
                     self.board[m.to.row][m.to.column].take().moved(!first_move);
                 self.board[taken_from.row][taken_from.column] = Some(taken);
             }
-            CastleMove(m1, m2) => {
-                self.board[m1.from.row][m1.from.column] =
-                    self.board[m1.to.row][m1.to.column].take().moved(false);
-                self.board[m2.from.row][m2.from.column] =
-                    self.board[m2.to.row][m2.to.column].take().moved(false);
+            CastleMove {
+                rook_move,
+                king_move,
+            } => {
+                self.board[rook_move.from.row][rook_move.from.column] = self.board
+                    [rook_move.to.row][rook_move.to.column]
+                    .take()
+                    .moved(false);
+                self.board[king_move.from.row][king_move.from.column] = self.board
+                    [king_move.to.row][king_move.to.column]
+                    .take()
+                    .moved(false);
             }
             PawnPromotion { m, taken, .. } => {
                 self.board[m.to.row][m.to.column] = taken;
                 self.board[m.from.row][m.from.column] = Some(Piece {
                     piece_type: Pawn,
-                    colour: self.get_other_player(),
+                    colour: !self.current_player,
                     has_moved: true,
                 });
             }
         }
+        self.current_player = !self.current_player;
         self.recompute_en_passant_availability();
     }
 
@@ -283,7 +191,7 @@ impl BoardState {
             .find_king(player)
             .expect(&format!("{:?} King not found {:#?}", player, self.board)[..]);
         let king_coordinates = Coordinate { row, column };
-        let checking_moves = self.get_moves_to(king_coordinates, other_player(player));
+        let checking_moves = self.get_moves_to(king_coordinates, !player);
         checking_moves.len() > 0
     }
 
@@ -389,6 +297,25 @@ impl BoardState {
     }
 
     fn would_be_check(&mut self, record: &MoveRecord, by: Colour) -> bool {
+        if let CastleMove { king_move, .. } = record {
+            // cannot castle out of check
+            if self.is_in_check(by) {
+                return true;
+            }
+            // cannot castle through check
+            for square in king_move.squares_between() {
+                let imaginary_king_move = SimpleMove {
+                    m: Move {
+                        from: king_move.from,
+                        to: square,
+                    },
+                    first_move: true, // this is always true for a valid CastleMove
+                };
+                if self.would_be_check(&imaginary_king_move, by) {
+                    return true;
+                }
+            }
+        }
         self.do_move(*record);
         let result = self.is_in_check(by);
         self.undo_move();

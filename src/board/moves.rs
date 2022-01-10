@@ -1,4 +1,4 @@
-use std::ops::{Deref, DerefMut};
+use std::ops::Deref;
 
 use super::{
     coordinates::{ColumnIndex, Coordinate, Move, RowIndex},
@@ -10,8 +10,18 @@ use super::{
 };
 use enum_map::EnumMap;
 
+type CastlingAvailabilityData = EnumMap<Colour, EnumMap<ColumnIndex, bool>>;
+
 #[derive(Debug, PartialEq)]
-pub struct CastlingAvailability(pub EnumMap<Colour, EnumMap<ColumnIndex, bool>>);
+pub struct CastlingAvailability(pub CastlingAvailabilityData);
+
+impl Deref for CastlingAvailability {
+    type Target = CastlingAvailabilityData;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum MoveRecord {
@@ -31,7 +41,10 @@ pub enum MoveRecord {
         /// true iff this is the first move of this piece
         first_move: bool,
     },
-    CastleMove(Move, Move),
+    CastleMove {
+        rook_move: Move,
+        king_move: Move,
+    },
     PawnPromotion {
         /// the move that mas made
         m: Move,
@@ -55,18 +68,25 @@ pub enum MoveSignal {
     RequestDraw,
     Castle(CastleDirection),
     Make(Move),
+    PromotePawnTo(PieceType),
 }
 
 #[derive(Debug, PartialEq)]
-pub struct MoveRecords(Vec<MoveRecord>);
+pub struct MoveRecords {
+    start_en_passant_availability: Option<Coordinate>,
+    moves: Vec<MoveRecord>,
+}
 
 impl MoveRecords {
-    pub fn new() -> Self {
-        Self(Default::default())
+    pub fn new(start_en_passant_availability: Option<Coordinate>) -> Self {
+        Self {
+            start_en_passant_availability,
+            moves: Default::default(),
+        }
     }
 
     pub fn get_en_passant_availability(&self, board: &Board) -> Option<Coordinate> {
-        if let Some(move_record) = self.0.last() {
+        if let Some(move_record) = self.moves.last() {
             match move_record {
                 MoveRecord::SimpleMove { m, .. } => {
                     let piece = board[m.to.row][m.to.column].expect(
@@ -80,11 +100,11 @@ impl MoveRecords {
                             return None; // Only a double PawnMove can precede an en-passant
                         }
                         let step = row_diff / 2; // A step in the direction of the double move
-                        let in_between = Coordinate {
+                        let square_in_between = Coordinate {
                             row: RowIndex::from((from_row_index + step) as usize),
                             column: m.to.column,
                         };
-                        Some(in_between)
+                        Some(square_in_between)
                     } else {
                         None // Only a PawnMove can precede an en-passant
                     }
@@ -94,33 +114,25 @@ impl MoveRecords {
                 }
             }
         } else {
-            // TODO: use start state
-            None
+            self.start_en_passant_availability
         }
     }
 
     pub fn can_undo(&self) -> bool {
-        self.0.len() > 0
+        self.moves.len() > 0
     }
-}
 
-// TODO: remove these implementations?
-impl Deref for MoveRecords {
-    type Target = Vec<MoveRecord>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
+    pub fn record_move(&mut self, record: MoveRecord) {
+        self.moves.push(record);
     }
-}
 
-impl DerefMut for MoveRecords {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+    pub fn pop_last_move(&mut self) -> Option<MoveRecord> {
+        self.moves.pop()
     }
 }
 
 impl Default for MoveRecords {
     fn default() -> Self {
-        Self::new()
+        Self::new(None)
     }
 }

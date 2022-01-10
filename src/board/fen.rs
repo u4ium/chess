@@ -6,10 +6,10 @@ use enum_map::EnumMap;
 use crate::parsing::parse_coordinate;
 
 use super::{
-    coordinates::{ColumnIndex, Coordinate},
+    coordinates::{ColumnIndex, Coordinate, RowIndex},
     grid::Board,
     moves::MoveRecords,
-    piece::Colour,
+    piece::{Colour, Movable},
     BoardState, CastlingAvailability,
     Colour::*,
     ColumnIndex::*,
@@ -58,7 +58,10 @@ fn parse_castling_availability(fen_castling_field: &str) -> Result<CastlingAvail
     Ok(CastlingAvailability(map))
 }
 
-fn parse_board(fen_pieces_field: &str) -> Result<Board, String> {
+fn parse_board(
+    fen_pieces_field: &str,
+    castling_availability: &CastlingAvailability,
+) -> Result<Board, String> {
     // TODO: prevent "buffer overflow"
     let rows: Vec<_> = fen_pieces_field.split('/').collect();
     let num_rows = rows.len();
@@ -78,7 +81,17 @@ fn parse_board(fen_pieces_field: &str) -> Result<Board, String> {
                         index += num_empty as usize - '0' as usize;
                     }
                     _ => {
-                        pieces[index] = Piece::from_char(c)?;
+                        let mut new_piece = Piece::from_char(c)?;
+
+                        let column_index = ColumnIndex::from(index);
+                        let row_index = RowIndex::from(row_index);
+                        new_piece.guess_and_set_is_moved(
+                            row_index,
+                            column_index,
+                            castling_availability,
+                        );
+
+                        pieces[index] = new_piece;
                         index += 1;
                     }
                 }
@@ -94,7 +107,7 @@ fn parse_board(fen_pieces_field: &str) -> Result<Board, String> {
         })
         .collect::<Result<Vec<_>, String>>()?;
 
-    Ok(EnumMap::from_array(row_maps.try_into().unwrap()))
+    Ok(Board(EnumMap::from_array(row_maps.try_into().unwrap())))
 }
 
 fn parse_en_passant_availability(
@@ -158,11 +171,9 @@ impl FromStr for BoardState {
 
         ]: [&str; 6] = fields.try_into().map_err(|_| format!("FEN PARSE ERROR: wrong number of fields in record ({}/6)", num_fields))?;
 
-        let board = parse_board(pieces)?;
-
-        let moves = match active_player {
-            "B" | "b" => MoveRecords::new(), // TODO: remove this field and replace with next player / number_of full_moves
-            "W" | "w" => MoveRecords::new(), // TODO: remove this field and replace with next player / number_of full_moves
+        let current_player = match active_player {
+            "B" | "b" => Black,
+            "W" | "w" => White,
             _ => {
                 return Err(format!(
                     "FEN PARSE ERROR: next player must be 'b' or 'w' (not {})",
@@ -172,13 +183,16 @@ impl FromStr for BoardState {
         };
 
         let castling_availability = parse_castling_availability(castling_availability)?;
-
         let en_passant_availability = parse_en_passant_availability(en_passant)?;
 
+        let board = parse_board(pieces, &castling_availability)?;
+
+        let moves = MoveRecords::new(en_passant_availability);
+
         Ok(Self {
+            current_player,
             board,
             moves,
-            castling_availability,
             en_passant_availability,
         })
     }
@@ -186,17 +200,15 @@ impl FromStr for BoardState {
 
 #[cfg(test)]
 mod tests {
-    use crate::board::CastlingAvailability;
-
     use super::BoardState;
     use std::str::FromStr;
 
     #[test]
     fn empty_board() {
         let expect: BoardState = BoardState {
+            current_player: Default::default(),
             board: Default::default(),
             moves: Default::default(),
-            castling_availability: CastlingAvailability(Default::default()),
             en_passant_availability: None,
         };
         let actual = BoardState::from_str("8/8/8/8/8/8/8/8 w - - - -").unwrap();
